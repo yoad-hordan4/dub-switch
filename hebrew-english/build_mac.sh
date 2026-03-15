@@ -30,6 +30,9 @@ echo "Building .app bundle..."
     --hidden-import "pynput.mouse._darwin" \
     "$SCRIPT_DIR/app.py"
 
+echo "Signing app (ad-hoc)..."
+codesign --force --deep --sign - "$SCRIPT_DIR/dist/HebrewEnglishSwitcher.app"
+
 echo ""
 echo "Done! App is at: dist/HebrewEnglishSwitcher.app"
 echo ""

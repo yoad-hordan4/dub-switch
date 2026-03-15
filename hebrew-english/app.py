@@ -13,7 +13,7 @@ import time
 import threading
 import multiprocessing
 from pynput import keyboard
-from pynput.keyboard import Key
+from pynput.keyboard import Key, Controller as _Controller
 from layout import convert_text, detect_language
 from input_source import detect_hebrew_and_english, switch_to
 
@@ -53,6 +53,7 @@ buffer_lock = threading.Lock()
 _conversion_lock = threading.Lock()
 pressed_keys = set()
 _reset_timer = None
+_caps_lock_pending = False   # True if last reset was caps_lock with no typing since
 
 
 def reset_buffer():
@@ -76,30 +77,46 @@ def schedule_idle_reset():
 # Works on both Mac and Windows.
 def _inject_worker(n, converted):
     """Delete n chars then paste the converted text."""
-    import pyperclip
-    from pynput.keyboard import Controller as Ctrl, Key as K
-    import time as t
+    import subprocess, time as t
 
-    ctrl      = Ctrl()
-    paste_mod = K.cmd if _IS_MAC else K.ctrl_l
+    if _IS_MAC:
+        # Use osascript + pbcopy/pbpaste — reliable across all Mac app types.
+        # The forked child has no CGEventTap, so events flow cleanly.
+        old_clip = subprocess.run(['pbpaste'], capture_output=True).stdout
+        proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+        proc.communicate(converted.encode('utf-8'))
 
-    old_clip = pyperclip.paste()
-    pyperclip.copy(converted)
+        backspace_script = '\n'.join(['    key code 51', '    delay 0.02'] * n)
+        script = f'''tell application "System Events"
+    delay 0.05
+{backspace_script}
+    delay 0.05
+    key code 9 using command down
+    delay 0.1
+end tell'''
+        subprocess.run(['osascript', '-e', script])
 
-    t.sleep(0.05)
-    for _ in range(n):
-        ctrl.press(K.backspace)
-        ctrl.release(K.backspace)
-        t.sleep(0.02)
-
-    t.sleep(0.05)
-    ctrl.press(paste_mod)
-    ctrl.press('v')
-    ctrl.release('v')
-    ctrl.release(paste_mod)
-    t.sleep(0.1)
-
-    pyperclip.copy(old_clip)
+        proc2 = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+        proc2.communicate(old_clip)
+    else:
+        # Windows: pynput Controller (no CGEventTap on Windows)
+        import pyperclip
+        from pynput.keyboard import Controller as Ctrl, Key as K
+        ctrl = Ctrl()
+        old_clip = pyperclip.paste()
+        pyperclip.copy(converted)
+        t.sleep(0.05)
+        for _ in range(n):
+            ctrl.press(K.backspace)
+            ctrl.release(K.backspace)
+            t.sleep(0.02)
+        t.sleep(0.05)
+        ctrl.press(K.ctrl_l)
+        ctrl.press('v')
+        ctrl.release('v')
+        ctrl.release(K.ctrl_l)
+        t.sleep(0.1)
+        pyperclip.copy(old_clip)
 
 
 # ── Trigger logic ─────────────────────────────────────────────────────────────
@@ -166,6 +183,12 @@ def on_press(key):
     ctrl = Key.ctrl_l in pressed_keys or Key.ctrl_r in pressed_keys
 
     if ctrl and hasattr(key, 'char') and key.char == '1':
+        global _caps_lock_pending
+        if _caps_lock_pending:
+            _caps_lock_pending = False
+            c = _Controller()
+            c.press(Key.caps_lock)
+            c.release(Key.caps_lock)
         if not is_typing:
             threading.Thread(target=do_conversion, daemon=True).start()
         return
@@ -186,6 +209,11 @@ def on_press(key):
         with buffer_lock:
             buffer.append(key.char)
         schedule_idle_reset()
+        return
+
+    if key == Key.caps_lock:
+        reset_buffer()
+        _caps_lock_pending = True
         return
 
     reset_keys = {Key.enter, Key.tab, Key.esc, Key.left, Key.right,
@@ -223,5 +251,7 @@ def main():
 
 
 if __name__ == '__main__':
-    multiprocessing.freeze_support()   # required for PyInstaller on Windows
+    if _IS_MAC:
+        multiprocessing.set_start_method('fork')   # near-instant child startup
+    multiprocessing.freeze_support()               # required for PyInstaller on Windows
     main()
