@@ -12,6 +12,7 @@ import sys
 import time
 import threading
 import multiprocessing
+import subprocess
 from pynput import keyboard
 from pynput.keyboard import Key, Controller as _Controller
 from layout import convert_text, detect_language
@@ -119,46 +120,86 @@ end tell'''
         pyperclip.copy(old_clip)
 
 
+# ── Selection injection worker (Mac — child process) ──────────────────────────
+def _inject_selection_worker(converted, old_clip_bytes):
+    """Paste converted text over a selection (Mac — child process)."""
+    import subprocess, time as t
+    proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+    proc.communicate(converted.encode('utf-8'))
+    script = '''tell application "System Events"
+    delay 0.05
+    key code 9 using command down
+    delay 0.1
+end tell'''
+    subprocess.run(['osascript', '-e', script])
+    proc2 = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+    proc2.communicate(old_clip_bytes)
+
+
 # ── Trigger logic ─────────────────────────────────────────────────────────────
 def do_conversion():
     global buffer, is_typing
     if not _conversion_lock.acquire(blocking=False):
         return  # another conversion is already running
     try:
-        with buffer_lock:
-            text = ''.join(buffer)
-            n    = len(buffer)
-            buffer = []
-
-        if not text.strip():
-            return
-
-        converted     = convert_text(text)
-        original_lang = detect_language(text)
-
-        print(f"[buffer]  {repr(text)}")
-
-        if converted == text:
-            print(f"[skip]    no change needed")
-            return
-
-        print(f"[convert] ({original_lang}) → {repr(converted)}")
-
-        is_typing = True
+        is_typing = True  # block buffering of Cmd+C / Ctrl+C keystrokes
 
         # Wait for Ctrl to be physically released before injecting
         deadline = time.time() + 2.0
         while time.time() < deadline:
-            has_ctrl = Key.ctrl_l in pressed_keys or Key.ctrl_r in pressed_keys
-            if not has_ctrl:
+            if not (Key.ctrl_l in pressed_keys or Key.ctrl_r in pressed_keys):
                 break
             time.sleep(0.02)
         time.sleep(0.08)
 
-        # Inject in a child process to keep event routing clean
-        p = multiprocessing.Process(target=_inject_worker, args=(n, converted))
-        p.start()
-        p.join()
+        # ── Try selection-based conversion (Mac only) ──────────────────────
+        selected_text  = None
+        old_clip_bytes = b''
+
+        if _IS_MAC:
+            old_clip_bytes = subprocess.run(['pbpaste'], capture_output=True).stdout
+            subprocess.run(['osascript', '-e',
+                'tell application "System Events" to keystroke "c" using command down'])
+            time.sleep(0.15)
+            new_clip_bytes = subprocess.run(['pbpaste'], capture_output=True).stdout
+            if new_clip_bytes != old_clip_bytes:
+                selected_text = new_clip_bytes.decode('utf-8', errors='replace')
+
+        if selected_text is not None and selected_text.strip():
+            # ── Selection mode ─────────────────────────────────────────────
+            converted     = convert_text(selected_text)
+            original_lang = detect_language(selected_text)
+            print(f"[selection] {repr(selected_text)}")
+            if converted == selected_text:
+                print(f"[skip]    no change needed")
+                subprocess.run(['pbcopy'], input=old_clip_bytes)
+                return
+            print(f"[convert] ({original_lang}) → {repr(converted)}")
+            p = multiprocessing.Process(
+                target=_inject_selection_worker, args=(converted, old_clip_bytes))
+            p.start()
+            p.join()
+
+        else:
+            # ── Buffer mode ────────────────────────────────────────────────
+            with buffer_lock:
+                text = ''.join(buffer)
+                n    = len(buffer)
+                buffer = []
+
+            if not text.strip():
+                return
+
+            converted     = convert_text(text)
+            original_lang = detect_language(text)
+            print(f"[buffer]  {repr(text)}")
+            if converted == text:
+                print(f"[skip]    no change needed")
+                return
+            print(f"[convert] ({original_lang}) → {repr(converted)}")
+            p = multiprocessing.Process(target=_inject_worker, args=(n, converted))
+            p.start()
+            p.join()
 
         time.sleep(0.1)
 

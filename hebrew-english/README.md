@@ -19,8 +19,8 @@ Typed something in the wrong language? Press **Ctrl + 1** and it fixes itself �
 
 ### Mac
 1. Unzip the downloaded file
-2. Double-click `HebrewEnglishSwitcher.app`
-3. If macOS says "unverified developer": go to **System Settings → Privacy & Security** → scroll down → click **Open Anyway**
+2. Right-click `HebrewEnglishSwitcher.app` → **Open**
+3. If macOS asks to confirm, click **Open** in the dialog that appears
 4. Go to **System Settings → Privacy & Security → Accessibility** → click **+** → add `HebrewEnglishSwitcher`
 5. The switcher is now running in the background
 
