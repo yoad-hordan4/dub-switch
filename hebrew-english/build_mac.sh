@@ -33,9 +33,15 @@ echo "Building .app bundle..."
 echo "Signing app (ad-hoc)..."
 codesign --force --deep --sign - "$SCRIPT_DIR/dist/HebrewEnglishSwitcher.app"
 
+echo "Packaging for distribution..."
+cp "$SCRIPT_DIR/Install.command" "$SCRIPT_DIR/dist/Install.command"
+chmod +x "$SCRIPT_DIR/dist/Install.command"
+cd "$SCRIPT_DIR/dist"
+zip -r "$SCRIPT_DIR/HebrewEnglishSwitcher-mac.zip" \
+    HebrewEnglishSwitcher.app \
+    Install.command
+
 echo ""
-echo "Done! App is at: dist/HebrewEnglishSwitcher.app"
+echo "Done! Distributable zip: HebrewEnglishSwitcher-mac.zip"
 echo ""
-echo "To distribute: zip the .app and share it."
-echo "Users must grant Accessibility permission on first run:"
-echo "  System Settings → Privacy & Security → Accessibility"
+echo "Users unzip and double-click Install.command — that's it."

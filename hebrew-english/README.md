@@ -19,8 +19,8 @@ Typed something in the wrong language? Press **Ctrl + 1** and it fixes itself �
 
 ### Mac
 1. Unzip the downloaded file
-2. Right-click `HebrewEnglishSwitcher.app` → **Open**
-3. If macOS asks to confirm, click **Open** in the dialog that appears
+2. Double-click `Install.command`
+3. If macOS asks to confirm, click **Open**
 4. Go to **System Settings → Privacy & Security → Accessibility** → click **+** → add `HebrewEnglishSwitcher`
 5. The switcher is now running in the background
 
@@ -85,5 +85,6 @@ Output is in the `dist/` folder.
 | `app.py` | Main app — keyboard listener, buffer, conversion trigger |
 | `layout.py` | Hebrew↔English character mapping table |
 | `input_source.py` | OS language switching (Mac TIS API / Windows user32) |
+| `Install.command` | Mac installer — strips quarantine, launches the app |
 | `build_mac.sh` | PyInstaller build script for Mac |
 | `build_windows.bat` | PyInstaller build script for Windows |
