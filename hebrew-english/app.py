@@ -120,30 +120,20 @@ end tell'''
         pyperclip.copy(old_clip)
 
 
-# ── Selection injection worker (child process) ────────────────────────────────
+# ── Selection injection worker (Mac — child process) ──────────────────────────
 def _inject_selection_worker(converted, old_clip_bytes):
-    """Paste converted text over a selection (child process)."""
+    """Paste converted text over a selection (Mac — child process)."""
     import subprocess, time as t
-    if sys.platform == 'darwin':
-        proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-        proc.communicate(converted.encode('utf-8'))
-        script = '''tell application "System Events"
+    proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+    proc.communicate(converted.encode('utf-8'))
+    script = '''tell application "System Events"
     delay 0.05
     key code 9 using command down
     delay 0.1
 end tell'''
-        subprocess.run(['osascript', '-e', script])
-        proc2 = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-        proc2.communicate(old_clip_bytes)
-    else:
-        import pyperclip
-        from pynput.keyboard import Controller as Ctrl, Key as K
-        ctrl = Ctrl()
-        pyperclip.copy(converted)
-        t.sleep(0.05)
-        ctrl.press(K.ctrl_l); ctrl.press('v'); ctrl.release('v'); ctrl.release(K.ctrl_l)
-        t.sleep(0.1)
-        pyperclip.copy(old_clip_bytes.decode('utf-8', errors='replace'))
+    subprocess.run(['osascript', '-e', script])
+    proc2 = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+    proc2.communicate(old_clip_bytes)
 
 
 # ── Trigger logic ─────────────────────────────────────────────────────────────
@@ -167,13 +157,7 @@ def do_conversion():
         old_clip_bytes = b''
 
         if _IS_MAC:
-            # Save real clipboard, then use a sentinel so detection works even
-            # when old clipboard content equals the selected text.
-            _SENTINEL = b'\x00DUBSWITCH_SENTINEL\x00'
             old_clip_bytes = subprocess.run(['pbpaste'], capture_output=True).stdout
-            proc_s = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-            proc_s.communicate(_SENTINEL)
-            # Send Cmd+C via pynput — key code 8 = C regardless of active layout.
             from pynput.keyboard import KeyCode as _KC
             _kc = _Controller()
             _kc.press(Key.cmd)
@@ -182,22 +166,8 @@ def do_conversion():
             _kc.release(Key.cmd)
             time.sleep(0.20)
             new_clip_bytes = subprocess.run(['pbpaste'], capture_output=True).stdout
-            if new_clip_bytes != _SENTINEL:
+            if new_clip_bytes != old_clip_bytes:
                 selected_text = new_clip_bytes.decode('utf-8', errors='replace')
-            else:
-                # No selection: restore original clipboard (sentinel is sitting there)
-                proc_r = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-                proc_r.communicate(old_clip_bytes)
-        else:
-            import pyperclip
-            old_clip_str  = pyperclip.paste()
-            old_clip_bytes = old_clip_str.encode('utf-8')
-            _c = _Controller()
-            _c.press(Key.ctrl_l); _c.press('c'); _c.release('c'); _c.release(Key.ctrl_l)
-            time.sleep(0.15)
-            new_clip_str = pyperclip.paste()
-            if new_clip_str != old_clip_str:
-                selected_text = new_clip_str
 
         if selected_text is not None and selected_text.strip():
             # ── Selection mode ─────────────────────────────────────────────
@@ -209,8 +179,7 @@ def do_conversion():
                 subprocess.run(['pbcopy'], input=old_clip_bytes)
                 return
             print(f"[convert] ({original_lang}) → {repr(converted)}")
-            # Call worker directly — our CGEventTap is passive (listen-only) and
-            # is_typing=True blocks on_press, so no re-entrancy risk from injected keys.
+            # Call directly — CGEventTap is passive and is_typing=True blocks on_press
             _inject_selection_worker(converted, old_clip_bytes)
 
         else:
@@ -313,23 +282,13 @@ def main():
     print(f"English input source: {_english_source or 'NOT FOUND'}")
     print("Press Ctrl+C to stop.\n")
 
-    for attempt in range(10):
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        if _IS_MAC:
+            listener._intercept = _trigger_intercept
         try:
-            with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-                if _IS_MAC:
-                    listener._intercept = _trigger_intercept
-                try:
-                    listener.join()
-                except KeyboardInterrupt:
-                    print("\nStopped.")
-                    return
-            return  # clean exit
-        except Exception as e:
-            if attempt < 9:
-                print(f"[startup] Listener failed: {e}. Retrying in 5s...")
-                time.sleep(5)
-            else:
-                print(f"[startup] Could not start after 10 attempts: {e}")
+            listener.join()
+        except KeyboardInterrupt:
+            print("\nStopped.")
 
 
 if __name__ == '__main__':
