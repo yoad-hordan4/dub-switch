@@ -1,3 +1,4 @@
+#!qודרqנןמqקמה פטאיםמ3
 #!/usr/bin/env python3
 """
 Hebrew-English keyboard switcher.
@@ -87,10 +88,12 @@ def _inject_worker(n, converted):
         proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
         proc.communicate(converted.encode('utf-8'))
 
-        backspace_script = '\n'.join(['    key code 51', '    delay 0.02'] * n)
+        # Select n chars left (Shift+Left Arrow) then paste over selection.
+        # This avoids field-hopping that can happen when backspace empties a field.
+        select_script = '\n'.join(['    key code 123 using shift down', '    delay 0.02'] * n)
         script = f'''tell application "System Events"
     delay 0.05
-{backspace_script}
+{select_script}
     delay 0.05
     key code 9 using command down
     delay 0.1
@@ -108,8 +111,10 @@ end tell'''
         pyperclip.copy(converted)
         t.sleep(0.05)
         for _ in range(n):
-            ctrl.press(K.backspace)
-            ctrl.release(K.backspace)
+            ctrl.press(K.shift)
+            ctrl.press(K.left)
+            ctrl.release(K.left)
+            ctrl.release(K.shift)
             t.sleep(0.02)
         t.sleep(0.05)
         ctrl.press(K.ctrl_l)
@@ -123,7 +128,6 @@ end tell'''
 # ── Selection injection worker (Mac) ─────────────────────────────────────────
 def _inject_selection_worker(converted, old_clip_bytes):
     """Paste converted text over the current selection (Mac only)."""
-    import time as t
     proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
     proc.communicate(converted.encode('utf-8'))
     script = '''tell application "System Events"
@@ -274,21 +278,89 @@ def on_release(key):
     pressed_keys.discard(key)
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
-def main():
-    print("Hebrew-English switcher running.")
-    print("Shortcut: Ctrl + 1")
-    print(f"Hebrew input source : {_hebrew_source or 'NOT FOUND'}")
-    print(f"English input source: {_english_source or 'NOT FOUND'}")
-    print("Press Ctrl+C to stop.\n")
-
+# ── Keyboard listener ────────────────────────────────────────────────────────
+def _start_listener():
+    """Start the global keyboard listener (blocking)."""
     with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
         if _IS_MAC:
             listener._intercept = _trigger_intercept
         try:
             listener.join()
         except KeyboardInterrupt:
-            print("\nStopped.")
+            pass
+
+
+# ── System tray / menu bar ───────────────────────────────────────────────────
+def _run_tray():
+    """Run the app with a system tray icon."""
+    if _IS_MAC:
+        import rumps
+
+        class DubSwitchApp(rumps.App):
+            def __init__(self):
+                super().__init__("DubSwitch", title="⌨")
+                self.menu = [
+                    rumps.MenuItem("DubSwitch is running"),
+                    None,  # separator
+                    rumps.MenuItem(f"Shortcut: Ctrl + 1"),
+                    None,
+                ]
+                # Start keyboard listener in background thread
+                t = threading.Thread(target=_start_listener, daemon=True)
+                t.start()
+
+            @rumps.clicked("Quit DubSwitch")
+            def quit_app(self, _):
+                rumps.quit_application()
+
+        DubSwitchApp().run()
+    else:
+        # Windows / Linux: use pystray
+        from pystray import Icon, Menu, MenuItem
+        from PIL import Image, ImageDraw
+
+        # Generate a simple icon (blue square with "DS" text)
+        def _create_icon():
+            img = Image.new('RGB', (64, 64), color=(59, 130, 246))
+            d = ImageDraw.Draw(img)
+            d.text((12, 18), "DS", fill="white")
+            return img
+
+        def _on_quit(icon, item):
+            icon.stop()
+
+        icon = Icon(
+            "DubSwitch",
+            _create_icon(),
+            "DubSwitch",
+            menu=Menu(
+                MenuItem("DubSwitch is running", None, enabled=False),
+                MenuItem("Shortcut: Ctrl + 1", None, enabled=False),
+                Menu.SEPARATOR,
+                MenuItem("Quit", _on_quit),
+            ),
+        )
+
+        # Start keyboard listener in background thread
+        t = threading.Thread(target=_start_listener, daemon=True)
+        t.start()
+
+        icon.run()
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+def main():
+    print("DubSwitch running.")
+    print("Shortcut: Ctrl + 1")
+    print(f"Hebrew input source : {_hebrew_source or 'NOT FOUND'}")
+    print(f"English input source: {_english_source or 'NOT FOUND'}")
+
+    # If --no-tray is passed (for debugging), run without system tray
+    if '--no-tray' in sys.argv:
+        print("Press Ctrl+C to stop.\n")
+        _start_listener()
+    else:
+        _run_tray()
 
 
 if __name__ == '__main__':

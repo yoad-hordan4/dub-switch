@@ -1,18 +1,18 @@
 #!/bin/bash
-# HebrewEnglishSwitcher — Installer
+# DubSwitch — Installer
 # Double-click this file to install and launch the app.
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-APP="$DIR/HebrewEnglishSwitcher.app"
+APP="$DIR/DubSwitch.app"
 
 if [ ! -d "$APP" ]; then
-    echo "Error: HebrewEnglishSwitcher.app not found."
-    echo "Make sure Install.command and HebrewEnglishSwitcher.app are in the same folder."
+    echo "Error: DubSwitch.app not found."
+    echo "Make sure Install.command and DubSwitch.app are in the same folder."
     read -p "Press Enter to close..."
     exit 1
 fi
 
-echo "=== HebrewEnglishSwitcher Installer ==="
+echo "=== DubSwitch Installer ==="
 echo ""
 echo "Removing macOS quarantine flag..."
 xattr -cr "$APP"
@@ -21,10 +21,11 @@ echo "Launching app..."
 open "$APP"
 
 echo ""
-echo "Done! HebrewEnglishSwitcher is now running."
+echo "Done! DubSwitch is now running."
+echo "Look for the ⌨ icon in your menu bar."
 echo ""
-echo "One more step — grant Accessibility permission:"
-echo "  System Settings → Privacy & Security → Accessibility"
-echo "  Click + and add HebrewEnglishSwitcher"
+echo "One more step — grant permissions:"
+echo "  System Settings → Privacy & Security → Accessibility → add DubSwitch"
+echo "  System Settings → Privacy & Security → Input Monitoring → add DubSwitch"
 echo ""
 echo "You can close this window."

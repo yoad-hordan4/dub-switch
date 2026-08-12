@@ -1,9 +1,9 @@
 @echo off
-REM Build HebrewEnglishSwitcher.exe for Windows distribution.
+REM Build DubSwitch.exe for Windows distribution.
 REM Run this on a Windows machine inside the project directory.
-REM Output: dist\HebrewEnglishSwitcher\HebrewEnglishSwitcher.exe
+REM Output: dist\DubSwitch\DubSwitch.exe
 
-echo === Hebrew-English Switcher - Windows Build ===
+echo === DubSwitch - Windows Build ===
 
 REM Create venv if needed
 if not exist .venv (
@@ -12,21 +12,23 @@ if not exist .venv (
 
 .venv\Scripts\pip install --quiet --upgrade pip
 .venv\Scripts\pip install --quiet -r requirements.txt
+.venv\Scripts\pip install --quiet pyinstaller
 
 echo Building .exe...
 .venv\Scripts\pyinstaller ^
     --noconfirm ^
     --onedir ^
     --windowed ^
-    --name "HebrewEnglishSwitcher" ^
+    --name "DubSwitch" ^
     --add-data "layout.py;." ^
     --add-data "input_source.py;." ^
     --hidden-import "pynput.keyboard._win32" ^
     --hidden-import "pynput.mouse._win32" ^
+    --hidden-import "pystray" ^
+    --hidden-import "PIL" ^
     app.py
 
 echo.
-echo Done! App is at: dist\HebrewEnglishSwitcher\HebrewEnglishSwitcher.exe
+echo Done! App is at: dist\DubSwitch\DubSwitch.exe
 echo.
-echo To distribute: zip the dist\HebrewEnglishSwitcher folder and share it.
-echo Users must run as Administrator on first launch so the keyboard hook works.
+echo To distribute: zip the dist\DubSwitch folder and share it.
