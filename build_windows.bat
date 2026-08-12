@@ -26,6 +26,7 @@ echo Building .exe...
     --hidden-import "pynput.mouse._win32" ^
     --hidden-import "pystray" ^
     --hidden-import "PIL" ^
+    --icon "icon.png" ^
     app.py
 
 echo.

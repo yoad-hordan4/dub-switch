@@ -28,6 +28,7 @@ echo "Building .app bundle..."
     --hidden-import "pynput.keyboard._darwin" \
     --hidden-import "pynput.mouse._darwin" \
     --hidden-import "rumps" \
+    --icon "$SCRIPT_DIR/icon.icns" \
     "$SCRIPT_DIR/app.py"
 
 echo "Signing app (ad-hoc)..."
