@@ -68,7 +68,7 @@ Requires Python 3.10+.
 
 ```bash
 git clone https://github.com/yoad-hordan4/dub-switch.git
-cd dub-switch/hebrew-english
+cd dub-switch
 
 # Mac
 ./build_mac.sh
