@@ -72,13 +72,13 @@ def schedule_idle_reset():
     _reset_timer.start()
 
 
-# ── Injection worker (runs in a child process) ─────────────────────────────────
-# A child process has no CGEventTap, so its injected keystrokes flow directly
-# to the focused app without being swallowed or double-processed.
-# Works on both Mac and Windows.
+# ── Injection worker ──────────────────────────────────────────────────────────
+# Deletes the last n characters and pastes the converted text.
+# On Mac: uses osascript (System Events) which bypasses CGEventTap.
+# On Windows: uses pynput Controller; is_typing flag prevents re-buffering.
 def _inject_worker(n, converted):
     """Delete n chars then paste the converted text."""
-    import subprocess, time as t
+    import time as t
 
     if _IS_MAC:
         # Use osascript + pbcopy/pbpaste — reliable across all Mac app types.
@@ -120,10 +120,10 @@ end tell'''
         pyperclip.copy(old_clip)
 
 
-# ── Selection injection worker (Mac — child process) ──────────────────────────
+# ── Selection injection worker (Mac) ─────────────────────────────────────────
 def _inject_selection_worker(converted, old_clip_bytes):
-    """Paste converted text over a selection (Mac — child process)."""
-    import subprocess, time as t
+    """Paste converted text over the current selection (Mac only)."""
+    import time as t
     proc = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
     proc.communicate(converted.encode('utf-8'))
     script = '''tell application "System Events"
@@ -292,7 +292,5 @@ def main():
 
 
 if __name__ == '__main__':
-    if _IS_MAC:
-        multiprocessing.set_start_method('fork')   # near-instant child startup
     multiprocessing.freeze_support()               # required for PyInstaller on Windows
     main()

@@ -5,6 +5,10 @@ from pynput.keyboard import Key
 buffer = []
 
 def on_press(key):
+    if key == Key.space:
+        buffer.append(' ')
+        print(f"buffer: {''.join(buffer)!r}")
+        return
     if hasattr(key, 'char') and key.char:
         buffer.append(key.char)
         print(f"buffer: {''.join(buffer)!r}")

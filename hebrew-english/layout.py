@@ -8,18 +8,13 @@ EN_TO_HE = {
     'k': 'ל', 'l': 'ך', ';': 'ף',
     'z': 'ז', 'x': 'ס', 'c': 'ב', 'v': 'ה', 'b': 'נ', 'n': 'מ', 'm': 'צ',
     ',': 'ת', '.': 'ץ',
-    # Uppercase (shift held)
-    'Q': '/', 'W': "׳", 'E': 'ק', 'R': 'ר', 'T': 'א', 'Y': 'ט', 'U': 'ו',
-    'I': 'ן', 'O': 'ם', 'P': 'פ',
-    'A': 'ש', 'S': 'ד', 'D': 'ג', 'F': 'כ', 'G': 'ע', 'H': 'י', 'J': 'ח',
-    'K': 'ל', 'L': 'ך',
-    'Z': 'ז', 'X': 'ס', 'C': 'ב', 'V': 'ה', 'B': 'נ', 'N': 'מ', 'M': 'צ',
-    # numbers
-    '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7','8': '8', '9': '9', '0': '0',
+    # digits pass through unchanged
+    '1': '1', '2': '2', '3': '3', '4': '4', '5': '5',
+    '6': '6', '7': '7', '8': '8', '9': '9', '0': '0',
 }
 
 # Reverse: Hebrew char -> English key
-HE_TO_EN = {v: k for k, v in EN_TO_HE.items() if k.islower() or k.isdigit() or k in ",./;׳"}
+HE_TO_EN = {v: k for k, v in EN_TO_HE.items() if not k.isupper()}
 
 # Hebrew characters set for detection
 HEBREW_CHARS = set(EN_TO_HE.values())

@@ -44,7 +44,7 @@ Just type normally. When you realize you typed in the wrong language:
 
 **Examples:**
 - Typed `שלום` with English layout active? → press Ctrl+1 → becomes `shalom` ✓
-- Typed `svmo` with Hebrew layout active? → press Ctrl+1 → becomes `שלום` ✓
+- Typed `akuo` with Hebrew layout active? → press Ctrl+1 → becomes `שלום` ✓
 
 **Notes:**
 - Works in any app: browsers, Word, Notes, Slack, etc.
