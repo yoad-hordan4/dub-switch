@@ -10,14 +10,7 @@ permissions:
 
 jobs:
   build-mac:
-    strategy:
-      matrix:
-        include:
-          - runner: macos-13
-            arch: x86_64
-          - runner: macos-latest
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -57,21 +50,21 @@ jobs:
           hdiutil create -volname "DubSwitch" \
             -srcfolder dist/dmg_tmp \
             -ov -format UDZO \
-            DubSwitch-mac-${{ matrix.arch }}.dmg
+            DubSwitch-mac.dmg
 
       - name: Create ZIP
         run: |
           cp Install.command dist/Install.command
           chmod +x dist/Install.command
-          cd dist && zip -r ../DubSwitch-mac-${{ matrix.arch }}.zip DubSwitch.app Install.command
+          cd dist && zip -r ../DubSwitch-mac.zip DubSwitch.app Install.command
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mac-build-${{ matrix.arch }}
+          name: mac-build
           path: |
-            DubSwitch-mac-${{ matrix.arch }}.dmg
-            DubSwitch-mac-${{ matrix.arch }}.zip
+            DubSwitch-mac.dmg
+            DubSwitch-mac.zip
 
   build-windows:
     runs-on: windows-latest
@@ -125,8 +118,6 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            mac-build-x86_64/DubSwitch-mac-x86_64.dmg
-            mac-build-x86_64/DubSwitch-mac-x86_64.zip
-            mac-build-arm64/DubSwitch-mac-arm64.dmg
-            mac-build-arm64/DubSwitch-mac-arm64.zip
+            mac-build/DubSwitch-mac.dmg
+            mac-build/DubSwitch-mac.zip
             windows-build/DubSwitch-windows.zip
