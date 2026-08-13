@@ -23,8 +23,6 @@ echo "Building .app bundle..."
     --onedir \
     --windowed \
     --name "DubSwitch" \
-    --add-data "layout.py:." \
-    --add-data "input_source.py:." \
     --hidden-import "pynput.keyboard._darwin" \
     --hidden-import "pynput.mouse._darwin" \
     --hidden-import "rumps" \

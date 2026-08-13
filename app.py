@@ -15,7 +15,7 @@ import threading
 import multiprocessing
 import subprocess
 from pynput import keyboard
-from pynput.keyboard import Key, Controller as _Controller
+from pynput.keyboard import Key, KeyCode, Controller as _Controller
 from layout import convert_text, detect_language
 from input_source import detect_hebrew_and_english, switch_to
 
@@ -26,15 +26,19 @@ if _IS_MAC:
                         CGEventGetIntegerValueField, kCGKeyboardEventKeycode)
 
 # ── Trigger key ────────────────────────────────────────────────────────────────
-# Ctrl+1.  On Mac we intercept and SUPPRESS this combo so it never reaches
-# the active text field.  On Windows Ctrl+1 doesn't produce visible characters
-# in most apps so suppression is not needed.
-_TRIGGER_KEYCODE = 18       # '1' key hardware keycode (Mac)
+# Ctrl+; mapped to the US-English semicolon key on the physical keyboard.
+# This is deliberately detected by physical keycode/virtual key rather than the
+# visible character, so it works the same in Hebrew and English layouts.
+# On Mac we intercept and SUPPRESS this combo so it never reaches the active
+# text field.  On Windows Ctrl+; usually doesn't produce visible characters in
+# most apps, so suppression is not needed.
+_TRIGGER_KEYCODE = 41       # ';' key hardware keycode on a US Mac keyboard
+_TRIGGER_VK = 186           # VK for ';' on a US Windows keyboard
 _CTRL_MASK  = 0x40000       # kCGEventFlagMaskControl (Mac)
 
 if _IS_MAC:
     def _trigger_intercept(event_type, event):
-        """Suppress Ctrl+1 so it doesn't reach the focused app (Mac only)."""
+        """Suppress Ctrl+; so it doesn't reach the focused app (Mac only)."""
         if event_type == kCGEventKeyDown:
             keycode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
             flags   = CGEventGetFlags(event)
@@ -227,7 +231,13 @@ def on_press(key):
 
     ctrl = Key.ctrl_l in pressed_keys or Key.ctrl_r in pressed_keys
 
-    if ctrl and hasattr(key, 'char') and key.char == '1':
+    trigger_pressed = False
+    if isinstance(key, KeyCode):
+        trigger_pressed = getattr(key, 'vk', None) == _TRIGGER_VK
+    if not trigger_pressed and hasattr(key, 'char') and key.char == ';':
+        trigger_pressed = True
+
+    if ctrl and trigger_pressed:
         global _caps_lock_pending
         if _caps_lock_pending:
             _caps_lock_pending = False
@@ -302,7 +312,7 @@ def _run_tray():
                 self.menu = [
                     rumps.MenuItem("DubSwitch is running"),
                     None,  # separator
-                    rumps.MenuItem(f"Shortcut: Ctrl + 1"),
+                    rumps.MenuItem("Shortcut: Ctrl + ;"),
                     None,
                 ]
                 # Start keyboard listener in background thread
@@ -335,7 +345,7 @@ def _run_tray():
             "DubSwitch",
             menu=Menu(
                 MenuItem("DubSwitch is running", None, enabled=False),
-                MenuItem("Shortcut: Ctrl + 1", None, enabled=False),
+                MenuItem("Shortcut: Ctrl + ;", None, enabled=False),
                 Menu.SEPARATOR,
                 MenuItem("Quit", _on_quit),
             ),
@@ -351,7 +361,7 @@ def _run_tray():
 # ── Entry point ───────────────────────────────────────────────────────────────
 def main():
     print("DubSwitch running.")
-    print("Shortcut: Ctrl + 1")
+    print("Shortcut: Ctrl + ;")
     print(f"Hebrew input source : {_hebrew_source or 'NOT FOUND'}")
     print(f"English input source: {_english_source or 'NOT FOUND'}")
 

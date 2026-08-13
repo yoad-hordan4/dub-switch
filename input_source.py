@@ -1,6 +1,6 @@
 """
 Input source / keyboard layout switcher.
-Mac:     uses Carbon TIS API via ctypes (no external deps).
+Mac:     uses Carbon TIS API via objc.loadBundleFunctions (pyobjc, bundled via rumps).
 Windows: uses user32 LoadKeyboardLayout + AttachThreadInput via ctypes.
 """
 
@@ -8,67 +8,61 @@ import sys
 
 # ── macOS ──────────────────────────────────────────────────────────────────────
 if sys.platform == 'darwin':
-    import ctypes
+    import objc
+    from Foundation import NSBundle
 
-    _carbon = ctypes.cdll.LoadLibrary('/System/Library/Frameworks/Carbon.framework/Carbon')
-    _cf = ctypes.cdll.LoadLibrary('/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation')
+    # Load Carbon TIS functions via pyobjc
+    _carbon_bundle = NSBundle.bundleWithPath_(
+        '/System/Library/Frameworks/Carbon.framework'
+    )
 
-    _carbon.TISCopyCurrentKeyboardInputSource.restype = ctypes.c_void_p
-    _carbon.TISCopyCurrentKeyboardInputSource.argtypes = []
-    _carbon.TISCreateInputSourceList.restype = ctypes.c_void_p
-    _carbon.TISCreateInputSourceList.argtypes = [ctypes.c_void_p, ctypes.c_bool]
-    _carbon.TISSelectInputSource.restype = ctypes.c_int
-    _carbon.TISSelectInputSource.argtypes = [ctypes.c_void_p]
-    _carbon.TISGetInputSourceProperty.restype = ctypes.c_void_p
-    _carbon.TISGetInputSourceProperty.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    # Define the TIS functions we need
+    _tis_funcs = [
+        ('TISCopyCurrentKeyboardInputSource', b'@'),
+        ('TISCreateInputSourceList', b'@@Z'),
+        ('TISSelectInputSource', b'i@'),
+        ('TISGetInputSourceProperty', b'@@^{__CFString=}'),
+    ]
+    _tis = {}
+    objc.loadBundleFunctions(_carbon_bundle, _tis, _tis_funcs)
 
-    _cf.CFArrayGetCount.restype = ctypes.c_long
-    _cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
-    _cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
-    _cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
-    _cf.CFStringGetCString.restype = ctypes.c_bool
-    _cf.CFStringGetCString.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_long, ctypes.c_uint32]
-    _cf.CFRelease.argtypes = [ctypes.c_void_p]
+    TISCopyCurrentKeyboardInputSource = _tis['TISCopyCurrentKeyboardInputSource']
+    TISCreateInputSourceList = _tis['TISCreateInputSourceList']
+    TISSelectInputSource = _tis['TISSelectInputSource']
+    TISGetInputSourceProperty = _tis['TISGetInputSourceProperty']
 
-    _kCFStringEncodingUTF8 = 0x08000100
-    _kTISPropertyInputSourceID = ctypes.c_void_p.in_dll(_carbon, 'kTISPropertyInputSourceID')
-
-    def _cf_string_get(ref):
-        buf = ctypes.create_string_buffer(512)
-        ok = _cf.CFStringGetCString(ref, buf, 512, _kCFStringEncodingUTF8)
-        return buf.value.decode('utf-8') if ok else ''
+    # Load the kTISPropertyInputSourceID constant
+    _tis_constants = {}
+    objc.loadBundleVariables(_carbon_bundle, _tis_constants, [
+        ('kTISPropertyInputSourceID', b'^{__CFString=}'),
+    ])
+    kTISPropertyInputSourceID = _tis_constants['kTISPropertyInputSourceID']
 
     def _get_source_id(source):
-        id_ref = _carbon.TISGetInputSourceProperty(source, _kTISPropertyInputSourceID.value)
-        return _cf_string_get(id_ref) if id_ref else ''
+        sid = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
+        return str(sid) if sid else ''
 
     def get_all_source_ids():
-        sources = _carbon.TISCreateInputSourceList(None, False)
-        count = _cf.CFArrayGetCount(sources)
-        ids = [_get_source_id(_cf.CFArrayGetValueAtIndex(sources, i)) for i in range(count)]
-        _cf.CFRelease(sources)
-        return ids
+        sources = TISCreateInputSourceList(None, False)
+        if not sources:
+            return []
+        return [_get_source_id(sources[i]) for i in range(len(sources))]
 
     def get_current_source_id():
-        source = _carbon.TISCopyCurrentKeyboardInputSource()
-        sid = _get_source_id(source) if source else ''
-        if source:
-            _cf.CFRelease(source)
-        return sid
+        source = TISCopyCurrentKeyboardInputSource()
+        return _get_source_id(source) if source else ''
 
     def switch_to(target_id):
         """Switch the active input source to target_id. Returns True on success."""
-        sources = _carbon.TISCreateInputSourceList(None, False)
-        count = _cf.CFArrayGetCount(sources)
-        found = False
-        for i in range(count):
-            source = _cf.CFArrayGetValueAtIndex(sources, i)
+        sources = TISCreateInputSourceList(None, False)
+        if not sources:
+            return False
+        for i in range(len(sources)):
+            source = sources[i]
             if _get_source_id(source) == target_id:
-                _carbon.TISSelectInputSource(source)
-                found = True
-                break
-        _cf.CFRelease(sources)
-        return found
+                TISSelectInputSource(source)
+                return True
+        return False
 
     def detect_hebrew_and_english():
         """

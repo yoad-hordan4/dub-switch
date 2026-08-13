@@ -47,8 +47,6 @@ jobs:
             --onedir \
             --windowed \
             --name "DubSwitch" \
-            --add-data "layout.py:." \
-            --add-data "input_source.py:." \
             --hidden-import "pynput.keyboard._darwin" \
             --hidden-import "pynput.mouse._darwin" \
             --hidden-import "rumps" \
@@ -105,8 +103,6 @@ jobs:
             --onedir `
             --windowed `
             --name "DubSwitch" `
-            --add-data "layout.py;." `
-            --add-data "input_source.py;." `
             --hidden-import "pynput.keyboard._win32" `
             --hidden-import "pynput.mouse._win32" `
             --hidden-import "pystray" `
